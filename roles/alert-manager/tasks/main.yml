@@ -1,0 +1,70 @@
+---
+# tasks file for alert-manager
+- name: Download & Unarchive alert-manager
+  unarchive:
+    src: https://github.com/prometheus/alertmanager/releases/download/v0.18.0/alertmanager-0.18.0.linux-amd64.tar.gz
+    dest: /tmp 
+    remote_src: yes
+
+- name: Create user alert-manager
+  user:
+    name: alertmanager
+    shell: /bin/bash
+    create_home: false
+
+- name: Create a directory alert-manager if it does not exist
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: alertmanager
+    group: alertmanager
+    mode: '0755'
+  with_items:
+    - {path: /etc/alertmanager}
+    - {path: /data/alertmanager}
+
+- name: Copy binary alert-manager
+  become: true
+  shell: "{{ item }}"
+  with_items:
+    - cp /tmp/alertmanager*/amtool /usr/local/bin
+    - cp /tmp/alertmanager*/alertmanager /usr/local/bin
+    - cp /tmp/alertmanager*/alertmanager.yml /etc/alertmanager
+    - rm -rf /tmp/alertmanager*
+
+- name: Changes owner & permission
+  file:
+    path: "{{ item.path }}"
+    owner: alertmanager
+    group: alertmanager
+    mode: u=rwx,g=rwx,o=r
+    recurse: "{{ item.recurse }}"
+  with_items:
+    - {path: /usr/local/bin/amtool, recurse: false}
+    - {path: /usr/local/bin/alertmanager, recurse: false}
+    - {path: /data/alertmanager, recurse: true}
+    - {path: /etc/alertmanager, recurse: true}
+
+- name: Copy alertmanager.service
+  copy:
+    src: alertmanager.service
+    dest: /lib/systemd/system
+
+- name: check config alertmanager
+  shell: amtool check-config /etc/alertmanager/alertmanager.yml
+
+- name: daemon reload
+  systemd:
+    daemon_reload: true
+
+- name: enable alertmanager.service
+  systemd:
+    state: started
+    name: alertmanager
+    enabled: true
+
+- name: check alertmanager via curl 
+  uri: 
+    url: http://localhost:9093
+    method: GET 
+    status_code: 200

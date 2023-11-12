@@ -1,0 +1,13 @@
+---
+# defaults file for webhook
+username: ubuntu
+
+# golang
+go_version: 1.21.0
+
+#template
+alert_name: example
+
+#config
+telegram_token: your_telegram_token
+time_zone: Asia/Jakarta

@@ -1,0 +1,11 @@
+---
+- name: monitoring setup
+  hosts: monitoring-server
+  become: true
+  remote_user: user
+  roles:
+    - prometheus
+    - node-exporter
+    - grafana
+    - alert-manager
+    - webhook

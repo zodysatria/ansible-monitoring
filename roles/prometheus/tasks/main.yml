@@ -1,0 +1,78 @@
+---
+# tasks file for prometheus
+- name: Create user prometheus
+  user:
+    name: prometheus
+    shell: /bin/bash
+    create_home: false
+
+- name: Create a directory prometheus if it does not exist
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  with_items:
+    - {path: /etc/prometheus}
+    - {path: /var/lib/prometheus}
+
+- name: Checking prometehus exists
+  stat: 
+    path: /tmp/prometheus*
+  register: prome
+
+- name: Download & unarchive prometheus
+  become: true
+  shell: "{{ item }}"
+  with_items:
+    - cd /tmp/ && curl -s https://api.github.com/repos/prometheus/prometheus/releases/latest | grep browser_download_url | grep linux-amd64 | cut -d '"' -f 4 | wget -qi - &&  tar xvf prometheus*.tar.gz
+    - chown prometheus:prometheus /tmp/prometheus*
+    - cp /tmp/prometheus*/prometheus /usr/bin/
+    - cp /tmp/prometheus*/prometheus /usr/local/bin/
+    - cp /tmp/prometheus*/promtool /usr/bin/
+    - cp /tmp/prometheus*/promtool /usr/local/bin/
+    - cp /tmp/prometheus*/prometheus.yml /etc/prometheus/prometheus.yml
+    - cp -r /tmp/prometheus*/consoles /etc/prometheus/
+    - cp -r /tmp/prometheus*/console_libraries /etc/prometheus/
+    - rm -rf /tmp/prometheus*.tar.gz*
+    - rm -rf /tmp/prometheus*
+  when: not prome.stat.exists
+
+- name: Changes owner & permission
+  file:
+    path: "{{ item.path }}"
+    owner: prometheus
+    group: prometheus
+    mode: u=rwx,g=rwx,o=r
+    recurse: "{{ item.recurse }}"
+  with_items:
+    - {path: /usr/bin/prometheus, recurse: false}
+    - {path: /usr/local/bin/prometheus, recurse: false}
+    - {path: /usr/bin/promtool, recurse: false}
+    - {path: /usr/local/bin/promtool, recurse: false}
+    - {path: /etc/prometheus/, recurse: true}
+
+- name: check config prometheus
+  shell: promtool check config /etc/prometheus/prometheus.yml
+
+- name: Copy prometheus.service
+  copy:
+    src: prometheus.service
+    dest: /etc/systemd/system/
+
+- name: daemon reload
+  systemd:
+    daemon_reload: true
+
+- name: enable prometheus.service
+  systemd:
+    state: started
+    name: prometheus
+    enabled: true
+
+- name: check prometheus via curl 
+  uri: 
+    url: http://localhost:9090
+    method: GET 
+    status_code: 200

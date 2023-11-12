@@ -1,0 +1,18 @@
+{{ if eq .Status "firing" }} <b>Example {{ .CommonLabels.alertname | str_Title }} </b> 🔥
+{{ range .Alerts }}
+<b>Alert {{ index .Labels "alertname" | str_Title }} 🔥 </b>
+Instance: {{ index .Labels "instance" }}
+Job: {{ index .Labels "job" }}
+Severity: {{ index .Labels "severity" }}
+Description: {{ .Annotations.description }}
+{{ end }}
+{{ end }}
+{{ if eq .Status "resolved" }}<b>Example Resolved {{ .CommonLabels.alertname | str_Title }} </b> ✅
+{{ range .Alerts }}
+<b>Resolved {{ index .Labels "alertname" | str_Title }} ✅ </b>
+Instance: {{ index .Labels "instance" }}
+Job: {{ index .Labels "job" }}
+Severity: {{ index .Labels "severity" }}
+Description: {{ .Annotations.description }}
+{{ end }}
+{{ end }}

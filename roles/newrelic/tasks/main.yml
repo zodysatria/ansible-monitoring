@@ -1,0 +1,33 @@
+---
+# tasks file for newrelic
+- name: check if newrelic-agent exists
+  stat:
+    path: /home/{{ username }}/newrelic 
+  register: nr
+
+- name: download & unarchive newrelic
+  become_user: "{{ username }}"
+  unarchive:
+    src: https://download.newrelic.com/newrelic/java-agent/newrelic-agent/8.5.0/newrelic-java.zip
+    dest: "/home/{{ username }}/" 
+    remote_src: yes
+  when: not nr.stat.exists
+
+- name: read the environment JAVA_OPTS
+  shell: cat /etc/environment
+  register: env_content
+
+- name: Add environment variable to profile file
+  lineinfile:
+    path: /etc/environment
+    insertafter: EOF
+    line: 'JAVA_OPTS="-javaagent:/home/{{ username }}/newrelic/newrelic.jar"'
+  when: not env_content.stdout.find('javaagent') != -1
+
+- name: echo $JAVA_OPTS environment
+  shell: "echo $JAVA_OPTS"
+  register: env
+
+- name: Display shell output
+  debug:
+    var: env.stdout_lines

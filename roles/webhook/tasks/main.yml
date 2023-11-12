@@ -1,0 +1,108 @@
+---
+# tasks file for webhook
+- name: Install depedencies
+  apt:
+    name: "{{ item }}"
+    state: present 
+    update_cache: yes
+  with_items: 
+    - make-guile
+    - git
+
+- name: Remove golang old go_version
+  become: true
+  shell: rm -rf /usr/local/go && rm -rf /usr/local/bin/go
+
+# - name: Download Go tarball
+#   get_url:
+#     url: "https://go.dev/dl/go1.21.4.linux-amd64.tar.gz"
+#     dest: "/tmp/"
+
+# - name: Unpack Go tarball
+#   unarchive:
+#     src: "/tmp/go1.21.4.linux-amd64.tar.gz"
+#     dest: "/usr/local/"
+#     remote_src: yes
+#     extra_opts: [--strip-components=1]
+
+- name: Donwload & unarchive golang
+  become: true
+  unarchive:
+    src: https://go.dev/dl/go1.21.4.linux-amd64.tar.gz
+    dest: /usr/local/
+    remote_src: yes
+    extra_opts: [--strip-components=1]
+
+- name: Set Go environment variable
+  lineinfile:
+    path: "/etc/profile"
+    line: 'export PATH="$PATH:/usr/local/go/bin"'
+    state: present
+
+- name: Reload bash profile
+  shell: . /etc/profile
+
+- name: Pull repository prometheus_bot
+  git:
+    repo: https://github.com/inCaller/prometheus_bot.git
+    dest: /tmp/prometheus_bot
+
+- name: Compile prometheus_bot
+  shell: "{{ item }}"
+  args:
+    chdir: /tmp/prometheus_bot
+  with_items:
+    - make clean
+    - make
+
+- name: Create a directory prometheus_bot if it does not exist
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - {path: /etc/prometheus_bot}
+    - {path: /etc/prometheus_bot/template}
+
+- name: Copy binary
+  become: true
+  copy:
+    src: /tmp/prometheus_bot/prometheus_bot
+    dest: /usr/local/bin
+    mode: u=rwx,g=rwx,o=r
+    remote_src: yes
+
+- name: Copy template & systemd
+  become: true
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - {src: template.tmpl, dest: /etc/prometheus_bot/template/template.tmpl}
+    - {src: prometheus_bot.service, dest: /usr/lib/systemd/system/prometheus_bot.service}
+
+- name: Copy config
+  become: true
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - {src: templates/config.j2, dest: /etc/prometheus_bot/config.yaml}
+
+- name: Cleanup download file
+  shell: "{{ item }}"
+  args:
+    chdir: /tmp
+  with_items: 
+    - rm -rf go1.21.4.linux-amd64.tar.gz
+    - rm -rf prometheus_bot
+
+- name: daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: enable prometheus_bot.service
+  ansible.builtin.systemd:
+    state: started
+    name: prometheus_bot
+    enabled: true

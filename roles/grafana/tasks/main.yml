@@ -1,0 +1,41 @@
+---
+# tasks file for grafana
+- name: Install apt-transport-https & software-properties-common wget
+  apt:
+    name: "{{ item.name }}"
+    update_cache: yes
+  with_items:
+    - {name: apt-transport-https}
+    - {name: software-properties-common}
+    - {name: wget}
+
+- name: Doneload & add apt-key grafana
+  become: true
+  shell: wget -q -O - https://packages.grafana.com/gpg.key | sudo apt-key add -
+
+- name: Add grafana repository
+  become: true
+  apt_repository:
+    repo: 'deb https://packages.grafana.com/oss/deb stable main'
+    filename: 'grafana'
+    state: present
+    update_cache: yes
+
+- name: Install grafana
+  apt:
+    name: grafana
+
+- name: Start grafana-server
+  ansible.builtin.systemd:
+    name: grafana-server
+    state: started
+
+- name: Sleep for 10 seconds and wait grafana started
+  ansible.builtin.wait_for:
+    timeout: 10
+
+- name: check grafana via curl 
+  uri: 
+    url: http://localhost:3000
+    method: GET 
+    status_code: 200

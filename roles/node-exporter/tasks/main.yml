@@ -1,0 +1,36 @@
+---
+# tasks file for node-exporter
+- name: check node exporter if exist
+  ansible.builtin.stat:
+   path: /usr/local/bin/node_exporter
+  register: ne
+
+- name: extract node exporter binary
+  ansible.builtin.unarchive:
+    src: https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+    dest: /usr/local/bin
+    remote_src: yes
+    extra_opts: [--strip-components=1]
+    mode: u=rwx,g=rwx,o=r
+  when: not ne.stat.exists
+
+- name: create systemd node exporter
+  ansible.builtin.copy:
+    src: node_exporter.service
+    dest: /etc/systemd/system/node_exporter.service
+
+- name: daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: enable node_exporter.service
+  ansible.builtin.systemd:
+    state: started
+    name: node_exporter
+    enabled: true
+
+- name: check node expoter via curl 
+  ansible.builtin.uri: 
+    url: http://localhost:9100
+    method: GET 
+    status_code: 200
